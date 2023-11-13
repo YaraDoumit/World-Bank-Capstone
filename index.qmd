@@ -1,0 +1,131 @@
+---
+title: "Capstone Project"
+subtitle: "DEDCG, The World Bank"
+author: "Yara Doumit"
+---
+
+## Loading Packages and Datasets
+
+```{r, include=FALSE}
+# Load main packages
+library(dplyr)
+library(data.table)
+library(ggplot2)
+library(treemap)
+library(d3Tree)
+library(plotly)
+
+# Loading the main datasets
+cm <- read.csv("data/child_marriage_unicef.csv")
+```
+
+## 1. Females Married by 15 vs Females Married by 18 in the World
+
+```{r}
+south_asia <- c("AFG: Afghanistan", "BGD: Bangladesh", "Bhutan", "ND: India", "MDV: Maldives", "NPL: Nepal", "PAK: Pakistan", "LKA: Sri Lanka")
+subsaharan_africa <- c(
+    "AGO: Angola", "BEN: Benin", "BWA: Botswana", "BFA: Burkina Faso", 
+    "BDI: Burundi", "CPV: Cabo Verde", "CMR: Cameroon", "CAF: Central African Republic", 
+    "TCD: Chad", "COM: Comoros", "COD: Congo, Democratic Republic of the", "COG: Congo, Republic of the", 
+    "DJI: Djibouti", "GNQ: Equatorial Guinea", "ERI: Eritrea", "SWZ: Eswatini", 
+    "ETH: Ethiopia", "GAB: Gabon", "GMB: Gambia", "GHA: Ghana", 
+    "GIN: Guinea", "GNB: Guinea-Bissau", "CIV: Ivory Coast", "KEN: Kenya", 
+    "LSO: Lesotho", "LBR: Liberia", "MDG: Madagascar", "MWI: Malawi", 
+    "MLI: Mali", "MRT: Mauritania", "MUS: Mauritius", "MOZ: Mozambique", 
+    "NAM: Namibia", "NER: Niger", "NGA: Nigeria", "RWA: Rwanda", 
+    "STP: Sao Tome and Principe", "SEN: Senegal", "SYC: Seychelles", "SLE: Sierra Leone", 
+    "SOM: Somalia", "ZAF: South Africa", "SSD: South Sudan", "SDN: Sudan", 
+    "TZA: Tanzania", "TGO: Togo", "UGA: Uganda", "ZMB: Zambia", "ZWE: Zimbabwe"
+)
+for (i in 1:nrow(cm)) {
+  if (cm$REF_AREA.Geographic.area[i] %in% south_asia) {
+    cm$region[i] <- "South Asia"
+    if (cm$INDICATOR.Indicator[i] == "PT_F_20-24_MRD_U15: Percentage of women (aged 20-24 years) married or in union before age 15"){
+      cm$group[i] <- "Girls married by 15"
+      cm$subgroup[i] <- "Girls married by 15 in South Asia"
+    } else if (cm$INDICATOR.Indicator[i] == "PT_F_20-24_MRD_U18: Percentage of women (aged 20-24 years) married or in union before age 18"){
+      cm$group[i] <- "Girls married by 18"
+      cm$subgroup[i] <- "Girls married by 18 in South Asia"
+    } else {
+      cm$group[i] <- "Other"
+      cm$subgroup[i] <- "Other"
+    }
+  } else if (cm$REF_AREA.Geographic.area[i] %in% subsaharan_africa) {
+    cm$region[i] <- "Sub-Saharan Africa"
+    if (cm$INDICATOR.Indicator[i] == "PT_F_20-24_MRD_U15: Percentage of women (aged 20-24 years) married or in union before age 15"){
+      cm$group[i] <- "Girls married by 15"
+      cm$subgroup[i] <- "Girls married by 15 in Sub-Saharan Africa"
+    } else if (cm$INDICATOR.Indicator[i] == "PT_F_20-24_MRD_U18: Percentage of women (aged 20-24 years) married or in union before age 18"){
+      cm$group[i] <- "Girls married by 18"
+      cm$subgroup[i] <- "Girls married by 18 in Sub-Saharan Africa"
+    } else {
+      cm$group[i] <- "Other"
+      cm$subgroup[i] <- "Other"
+    }
+  } else { 
+    cm$region[i] <- "Other"
+    cm$group[i] <- "Other"
+    cm$subgroup[i] <- "Other"
+  }
+}
+cm_region <- subset(cm, region %in% c("South Asia", "Sub-Saharan Africa") & group != "Other")
+names(cm_region)[names(cm_region) == "REF_AREA.Geographic.area"] <- "country"
+cm_region$country <- sub(".*: ", "", cm_region$country)
+```
+
+### Tree Map
+```{r}
+sa <- unique(cm_region$country[cm_region$region == "South Asia"])
+ssa <- unique(cm_region$country[cm_region$region == "Sub-Saharan Africa"])
+sa_15 <- cm_region$OBS_VALUE.Observation.Value[cm_region$subgroup == "Girls married by 15 in South Asia"]
+sa_18 <- cm_region$OBS_VALUE.Observation.Value[cm_region$subgroup == "Girls married by 18 in South Asia"]
+ssa_15 <- cm_region$OBS_VALUE.Observation.Value[cm_region$subgroup == "Girls married by 18 in Sub-Saharan Africa"]
+ssa_18 <- cm_region$OBS_VALUE.Observation.Value[cm_region$subgroup == "Girls married by 18 in Sub-Saharan Africa"]
+t_15 <- round(mean(c(sa_15, ssa_15)),1)
+t_18 <- round(mean(c(sa_18, ssa_18)),1)
+
+
+labels1 <- c(sa, ssa, c("Girls married by 15 in South Asia", "Girls married by 15 in Sub-Saharan Africa", "Girls married by 15"))
+parents1 <- c(
+    rep("Girls married by 15 in South Asia", length(sa)),
+    rep("Girls married by 15 in Sub-Saharan Africa", length(ssa)),
+    c("Girls married by 15", "Girls married by 15", "")
+)
+values1 <- c(sa_15, ssa_15, c(round(mean(sa_15),1), round(mean(ssa_15),1), t_15))
+
+labels2 <- c(sa, ssa, c("Girls married by 18 in South Asia", "Girls married by 18 in Sub-Saharan Africa", "Girls married by 18"))
+parents2 <- c(
+    rep("Girls married by 18 in South Asia", length(sa)),
+    rep("Girls married by 18 in Sub-Saharan Africa", length(ssa)),
+    c("Girls married by 18", "Girls married by 18", "")
+    )
+values2 <- c(sa_18, ssa_18, c(round(mean(sa_18),1), round(mean(ssa_18),1), t_18))
+
+fig <- plot_ly(
+  type='treemap',
+  labels=labels1,
+  parents=parents1,
+  values=values1,
+  domain=list(column=0),
+  marker=list(colorscale='Reds'),
+  name = )
+
+fig <- fig %>% add_trace(
+  type='treemap',
+  labels=labels2,
+  parents=parents2,
+  values=values2,
+  domain=list(column=1),
+  marker=list(colorscale='Reds'))
+
+fig <- fig %>% layout(grid=list(columns=2, rows=1)) %>% layout(
+  title = "Girls Married by 15 vs Females Married by 18 in South Asia and Sub-Saharan Africa",
+  uniformtext = list(
+    minsize = 10, 
+    mode = 'hide'
+  )
+) 
+fig
+```
+
+
