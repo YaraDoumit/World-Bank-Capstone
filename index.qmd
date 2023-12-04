@@ -153,7 +153,7 @@ subsaharan_africa <- c(
 merged_df$`Female Married by 18`[merged_df$`Female Married by 18` == "-"] <- NA
 merged_df$`Female Married by 18` <- as.numeric(merged_df$`Female Married by 18`)
 merged_df$female_population_0_to_18 <- as.numeric(merged_df$female_population_0_to_18)
-merged_df$`Absolute Number` <- merged_df$`Female Married by 18`
+merged_df$`Absolute Number` <- round(merged_df$female_population_0_to_18*merged_df$`Female Married by 18`/100)
 
 for (i in 1:nrow(merged_df)) {
   if (merged_df$Country[i] %in% south_asia) {
@@ -187,9 +187,7 @@ fig <- plot_ly(
   labels=labels1,
   parents=parents1,
   values=values1,
-  hovertemplate = paste('%{label}<br>%{value}', '<extra></extra>'),
-  #marker=list(colorscale='Viridis')
-  )
+  hovertemplate = paste('%{label}<br>%{value}', '<extra></extra>'))
 
 fig
 ```
