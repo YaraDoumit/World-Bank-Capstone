@@ -9,20 +9,26 @@ author: "Yara Doumit"
 ```{r, include=FALSE}
 # Load main packages
 library(dplyr)
+library(readxl)
 library(data.table)
 library(ggplot2)
 library(treemap)
 library(d3Tree)
 library(plotly)
+library(maps)
+library(rworldmap)
+library(corrgram)
 
 # Loading the main datasets
 cm <- read.csv("data/child_marriage_unicef.csv")
+corr_df <- read.csv('data/combined_child_marriage_with_additional_indicators.csv')
+merged_df <- read_excel('data/updated_final_merged_data.xlsx')
 ```
 
-## 1. Females Married by 15 vs Females Married by 18 in the World
+## 1. Females Married by 15 vs Females Married by 18 in the Sub-Saharan Africa and South Asia
 
 ```{r}
-south_asia <- c("AFG: Afghanistan", "BGD: Bangladesh", "Bhutan", "ND: India", "MDV: Maldives", "NPL: Nepal", "PAK: Pakistan", "LKA: Sri Lanka")
+south_asia <- c("AFG: Afghanistan", "BGD: Bangladesh", "Bhutan", "IND: India", "MDV: Maldives", "NPL: Nepal", "PAK: Pakistan", "LKA: Sri Lanka")
 subsaharan_africa <- c(
     "AGO: Angola", "BEN: Benin", "BWA: Botswana", "BFA: Burkina Faso", 
     "BDI: Burundi", "CPV: Cabo Verde", "CMR: Cameroon", "CAF: Central African Republic", 
@@ -73,7 +79,8 @@ names(cm_region)[names(cm_region) == "REF_AREA.Geographic.area"] <- "country"
 cm_region$country <- sub(".*: ", "", cm_region$country)
 ```
 
-### Tree Map
+### Tree Map (Rate)
+
 ```{r}
 sa <- unique(cm_region$country[cm_region$region == "South Asia"])
 ssa <- unique(cm_region$country[cm_region$region == "Sub-Saharan Africa"])
@@ -81,8 +88,8 @@ sa_15 <- cm_region$OBS_VALUE.Observation.Value[cm_region$subgroup == "Girls marr
 sa_18 <- cm_region$OBS_VALUE.Observation.Value[cm_region$subgroup == "Girls married by 18 in South Asia"]
 ssa_15 <- cm_region$OBS_VALUE.Observation.Value[cm_region$subgroup == "Girls married by 18 in Sub-Saharan Africa"]
 ssa_18 <- cm_region$OBS_VALUE.Observation.Value[cm_region$subgroup == "Girls married by 18 in Sub-Saharan Africa"]
-t_15 <- round(mean(c(sa_15, ssa_15)),1)
-t_18 <- round(mean(c(sa_18, ssa_18)),1)
+t_15 <- round(mean(c(sa_15, ssa_15)),2)
+t_18 <- round(mean(c(sa_18, ssa_18)),2)
 
 
 labels1 <- c(sa, ssa, c("Girls married by 15 in South Asia", "Girls married by 15 in Sub-Saharan Africa", "Girls married by 15"))
@@ -91,7 +98,7 @@ parents1 <- c(
     rep("Girls married by 15 in Sub-Saharan Africa", length(ssa)),
     c("Girls married by 15", "Girls married by 15", "")
 )
-values1 <- c(sa_15, ssa_15, c(round(mean(sa_15),1), round(mean(ssa_15),1), t_15))
+values1 <- c(sa_15, ssa_15, c(round(mean(sa_15),2), round(mean(ssa_15),2), t_15))
 
 labels2 <- c(sa, ssa, c("Girls married by 18 in South Asia", "Girls married by 18 in Sub-Saharan Africa", "Girls married by 18"))
 parents2 <- c(
@@ -99,13 +106,14 @@ parents2 <- c(
     rep("Girls married by 18 in Sub-Saharan Africa", length(ssa)),
     c("Girls married by 18", "Girls married by 18", "")
     )
-values2 <- c(sa_18, ssa_18, c(round(mean(sa_18),1), round(mean(ssa_18),1), t_18))
+values2 <- c(sa_18, ssa_18, c(round(mean(sa_18),2), round(mean(ssa_18),2), t_18))
 
 fig <- plot_ly(
   type='treemap',
   labels=labels1,
   parents=parents1,
   values=values1,
+  hovertemplate = paste('%{label}<br>%{value}%', '<extra></extra>'),
   domain=list(column=0),
   marker=list(colorscale='Reds'),
   name = )
@@ -115,17 +123,175 @@ fig <- fig %>% add_trace(
   labels=labels2,
   parents=parents2,
   values=values2,
+  hovertemplate = paste('%{label}<br>%{value}%', '<extra></extra>'),
   domain=list(column=1),
   marker=list(colorscale='Reds'))
 
-fig <- fig %>% layout(grid=list(columns=2, rows=1)) %>% layout(
-  title = "Girls Married by 15 vs Females Married by 18 in South Asia and Sub-Saharan Africa",
-  uniformtext = list(
-    minsize = 10, 
-    mode = 'hide'
-  )
-) 
+fig <- fig %>% layout(grid=list(columns=2, rows=1)) 
 fig
 ```
+
+### Tree Map (Absolute Number)
+```{r}
+south_asia <- c("Afghanistan", "Bangladesh", "Bhutan", "India", "Maldives", "Nepal", "Pakistan", "Sri Lanka")
+subsaharan_africa <- c(
+    "Angola", "Benin", "Botswana", "Burkina Faso", 
+    "Burundi", "Cabo Verde", "Cameroon", "Central African Republic", 
+    "Chad", "Comoros", "Congo, Democratic Republic of the", "Congo, Republic of the", 
+    "Djibouti", "Equatorial Guinea", "Eritrea", "Eswatini", 
+    "Ethiopia", "Gabon", "Gambia", "Ghana", 
+    "Guinea", "Guinea-Bissau", "Ivory Coast", "Kenya", 
+    "Lesotho", "Liberia", "Madagascar", "Malawi", 
+    "Mali", "Mauritania", "Mauritius", "Mozambique", 
+    "Namibia", "Niger", "Nigeria", "Rwanda", 
+    "Sao Tome and Principe", "Senegal", "Seychelles", "Sierra Leone", 
+    "Somalia", "South Africa", "South Sudan", "Sudan", 
+    "Tanzania", "Togo", "Uganda", "Zambia", "Zimbabwe"
+)
+
+
+merged_df$`Female Married by 18`[merged_df$`Female Married by 18` == "-"] <- NA
+merged_df$`Female Married by 18` <- as.numeric(merged_df$`Female Married by 18`)
+merged_df$female_population_0_to_18 <- as.numeric(merged_df$female_population_0_to_18)
+merged_df$`Absolute Number` <- merged_df$female_population_0_to_18*merged_df$`Female Married by 18`/100
+
+for (i in 1:nrow(merged_df)) {
+  if (merged_df$Country[i] %in% south_asia) {
+    merged_df$region[i] <- "South Asia"
+  } else if (merged_df$Country[i] %in% subsaharan_africa) {
+    merged_df$region[i] <- "Sub-Saharan Africa"
+  } else { 
+    merged_df$region[i] <- "Other"
+  }
+}
+
+sa <- unique(merged_df$Country[merged_df$region == "South Asia"])
+ssa <- unique(merged_df$Country[merged_df$region == "Sub-Saharan Africa"])
+sa_abs <- merged_df$`Absolute Number`[merged_df$region == "South Asia"]
+ssa_abs <- merged_df$`Absolute Number`[merged_df$region == "Sub-Saharan Africa"]
+t_sa <- sum(sa_abs, na.rm=TRUE)
+t_ssa <- sum(ssa_abs, na.rm=TRUE)
+
+
+labels1 <- c(sa, ssa, c("Girls married by 18 in South Asia", "Girls married by 18 in Sub-Saharan Africa", "Girls married by 18"))
+parents1 <- c(
+    rep("Girls married by 18 in South Asia", length(sa)),
+    rep("Girls married by 18 in Sub-Saharan Africa", length(ssa)),
+    c("Girls married by 18", "Girls married by 18", "")
+)
+values1 <- c(sa_abs, ssa_abs, t_sa, t_ssa, t_sa+t_ssa)
+
+
+fig <- plot_ly(
+  type='treemap',
+  labels=labels1,
+  parents=parents1,
+  values=values1,
+  hovertemplate = paste('%{label}<br>%{value}', '<extra></extra>'),
+  marker=list(colorscale='Reds'))
+
+fig
+```
+
+
+
+
+## 2. Females Married by 15 Sub-Saharan Africa and South Asia countries
+
+```{r, warning=FALSE}
+world_map <- map_data("world")
+
+country_coords <- world_map %>%
+  group_by(region) %>%
+  summarize(LAT = mean(lat), LON = mean(long))
+
+cm_region_15 <- cm_region %>%
+  filter(group == "Girls married by 15") %>%
+  mutate(hover_text = paste("Country:", country, "<br>Value:", OBS_VALUE.Observation.Value, "%"))
+
+cm_region_15 <- merge(cm_region_15, country_coords, by.x = "country", by.y = "region", all.x = TRUE)
+
+p <- ggplot() +
+  geom_polygon(data = world_map, aes(x = long, y = lat, group = group), fill = "white", color = "black") +
+  geom_point(data = cm_region_15, aes(x = LON, y = LAT, 
+                                      size = OBS_VALUE.Observation.Value, 
+                                      text = hover_text, color = region), 
+             alpha = 0.7) + 
+  geom_point(data = cm_region_15, aes(x = LON, y = LAT, 
+                                      size = OBS_VALUE.Observation.Value, 
+                                      text = hover_text), color = "black",
+             alpha = 0.7, stroke = 0.5, shape = 21) + 
+  scale_size(range = c(1, 10), name="Prevalence of Girls Married by 15 (%)") +
+  coord_fixed(xlim = c(-20, 100), ylim = c(-35, 35), ratio = 1.3) +
+  labs(x = " ", y = " ", title = "Prevalence of Girls Married by 15 (%)") +
+  guides(size = "none") + theme_void()
+
+ggplotly(p, tooltip = "text")
+```
+
+## 3. Cross-correlations between countries per different indicators
+### 
+```{r, fig.height=8, fig.width=9}
+corr_df <- read.csv('data/combined_child_marriage_with_additional_indicators.csv')
+corr_df$Female.Married.by.15[corr_df$Female.Married.by.15 == "-"] <- NA
+corr_df$Female.Married.by.18[corr_df$Female.Married.by.18 == "-"] <- NA
+corr_df$Male.Married.by.18[corr_df$Male.Married.by.18 == "-"] <- NA
+corr_df$Female.Married.by.15 <- as.numeric(corr_df$Female.Married.by.15)
+corr_df$Male.Married.by.18 <- as.numeric(corr_df$Male.Married.by.18)
+corr_df$Female.Married.by.18 <- as.numeric(corr_df$Female.Married.by.18)
+names(corr_df)[names(corr_df) == "Female.Married.by.15"] <- "Female Married by 15"
+names(corr_df)[names(corr_df) == "Female.Married.by.18"] <- "Female Married by 18"
+names(corr_df)[names(corr_df) == "Male.Married.by.18"] <- "Male Married by 18"
+names(corr_df)[names(corr_df) == "GDP.per.Capita"] <- "GDP"
+names(corr_df)[names(corr_df) == "Female.Labor.Participation.Rate"] <- "Female Labor"
+names(corr_df)[names(corr_df) == "Female.Youth.Literacy.Rate"] <- "Female Literacy"
+
+
+# Generate corrgram plot
+corrgram(corr_df, 
+         order=TRUE, 
+         lower.panel=panel.pie, 
+         upper.panel=panel.pts, 
+         text.panel=panel.txt, 
+         main="Correlation Plots",
+         cex.labels=1.2,   
+         font.labels=2) 
+
+```
+```{r, fig.height=8, fig.width=9}
+
+# Generate corrgram plot
+corrgram(corr_df, 
+         order=TRUE, 
+         lower.panel=panel.pie, 
+         upper.panel=panel.ellipse, 
+         text.panel=panel.txt, 
+         main="Correlation Plots",
+         cex.labels=1.2,   
+         font.labels=2) 
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
